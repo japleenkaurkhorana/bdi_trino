@@ -1,0 +1,23 @@
+---
+apiVersion: opa.stackable.tech/v1alpha1
+kind: OpaCluster
+metadata:
+  name: opa
+  namespace: "b-{{ .Release.Name }}-in"
+spec:
+  image:
+    custom: "docker.stackable.tech/stackable/opa:1.0.1-stackable0.0.0-dev"
+    productVersion: "1.0.1"
+  servers:
+    config:
+      logging:
+        containers:
+          opa:
+            console:
+              level: INFO
+            loggers:
+              decision:
+                level: INFO
+    roleGroups:
+      default: {}
+---

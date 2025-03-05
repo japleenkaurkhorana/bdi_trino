@@ -1,0 +1,29 @@
+---
+{{- if .Values.trino.tpcds -}}
+apiVersion: trino.stackable.tech/v1alpha1
+kind: TrinoCatalog
+metadata:
+  # The name of the catalog as it will appear in Trino
+  name: tpcds
+  namespace: "b-{{ .Release.Name }}-in"
+  # TrinoCluster can use these labels to select which catalogs to include
+  labels:
+    trino: trino
+spec:
+  connector:
+    tpcds: {} # No options needed
+{{- end }}
+---
+apiVersion: trino.stackable.tech/v1alpha1
+kind: TrinoCatalog
+metadata:
+  # The name of the catalog as it will appear in Trino
+  name: "b-{{ .Release.Name }}"
+  # TrinoCluster can use these labels to select which catalogs to include
+  namespace: "b-{{ .Release.Name }}-in"
+  labels:
+    trino: trino
+spec:
+  connector:
+    blackHole: {}
+...

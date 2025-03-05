@@ -1,0 +1,5 @@
+apiVersion: v2
+name: trino-openshift
+description: Stackable Trino on OpenShift with OPA and Auth to EntraID
+
+version: 0.0.1 # unused but required by HELM

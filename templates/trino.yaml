@@ -1,0 +1,65 @@
+---
+apiVersion: trino.stackable.tech/v1alpha1
+kind: TrinoCluster
+metadata:
+  name: trino
+  namespace: "b-{{ .Release.Name }}-in"
+spec:
+  image:
+    productVersion: "451"
+  clusterConfig:
+    listenerClass: external-stable
+    catalogLabelSelector:
+      matchLabels:
+        trino: trino
+    authentication:
+      - authenticationClass: "{{ .Release.Name }}-auth"
+        oidc:
+          clientCredentialsSecret: auth-secret
+    authorization:
+      opa:
+        configMapName: opa
+        package: trino
+  coordinators:
+    config:
+      resources:
+        cpu:
+          min: {{ .Values.trino.coordinator.cpu.min }}
+          max: {{ .Values.trino.coordinator.cpu.max }}
+        memory:
+          limit: {{ .Values.trino.coordinator.memory }}
+    roleGroups:
+      default:
+        replicas: {{ .Values.trino.coordinator.count }}
+    configOverrides:
+      config.properties:
+        deprecated.http-server.authentication.oauth2.groups-field: "groups"
+        oauth2-jwk.http-client.http-proxy: "{{ .Values.httpProxy }}"
+        http-server.process-forwarded: "true"
+        http-server.authentication.oauth2.access-token-issuer: "{{ .Values.tokenIssuer }}"
+        http-server.authentication.oauth2.additional-audiences: "api://{{ .Values.clientId }}"
+        http-server.authentication.oauth2.scopes: "api://{{ .Values.clientId }}/trino"
+        http-server.authentication.oauth2.oidc.use-userinfo-endpoint: "false"
+  workers:
+    config:
+      resources:
+        cpu:
+          min: {{ .Values.trino.worker.cpu.min }}
+          max: {{ .Values.trino.worker.cpu.max }}
+        memory:
+          limit: {{ .Values.trino.worker.memory }}
+    roleGroups:
+      default:
+        replicas: {{ .Values.trino.worker.count }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: auth-secret
+  namespace: "b-{{ .Release.Name }}-in"
+type: kubernetes.io/opaque
+stringData:
+  clientId: "{{ .Values.clientId }}"
+  clientSecret: "{{ .Values.clientSecret }}"
+  sparkHistoryCookieSecret: "{{ randAlphaNum 24 }}"
+

@@ -1,0 +1,126 @@
+{{ $write := .Values.authGroups.write | default (printf "idm2bcd_bdps_b_%s_write" .Release.Name) }}
+{{ $admin := .Values.authGroups.admin | default (printf "idm2bcd_bdps_b_%s_admin" .Release.Name) }}
+---
+{{- if .Values.sparkhistory.enabled -}}
+apiVersion: spark.stackable.tech/v1alpha1
+kind: SparkHistoryServer
+metadata:
+  name: spark-history
+  namespace: "b-{{ .Release.Name }}-in"
+spec:
+  image:
+    productVersion: 3.5.2
+  logFileDirectory:
+    s3:
+      prefix: /
+      bucket:
+        reference: spark-s3bucket # as defined in s3.yaml
+  sparkConf:
+    spark.ui.requestHeaderSize: "4096000" # 4MB so those stupid amounts of groups fit in
+  nodes:
+    roleGroups:
+      default:
+        replicas: 1
+        config:
+          cleaner: true
+          resources:
+            cpu:
+              min: "{{ .Values.sparkhistory.cpu.min }}"
+              max: "{{ .Values.sparkhistory.cpu.max }}"
+            memory:
+              limit: "{{ .Values.sparkhistory.memory }}"
+---
+# Create a secure connection to the proxy via a route
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: sparkhistory
+  namespace: "b-{{ .Release.Name }}-in"
+spec:
+  to:
+    kind: Service
+    name: proxy
+  port:
+    targetPort: proxy
+  tls:
+    termination: edge
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: proxy
+  namespace: "b-{{ .Release.Name }}-in"
+spec:
+  ports:
+    - name: proxy
+      port: 443
+      targetPort: 4180
+  selector:
+    app: proxy
+---
+# Launch a proxy as a sidecar
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proxy
+  namespace: "b-{{ .Release.Name }}-in"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: proxy
+  template:
+    metadata:
+      labels:
+        app: proxy
+    spec:
+      containers:
+        - name: oauth-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4180
+              name: http
+          args:
+            - --http-address=0.0.0.0:4180
+            - --provider=entra-id
+            - --oidc-issuer-url=https://login.microsoftonline.com/{{ .Values.AzureTenant }}/v2.0
+            - --scope=openid
+            - --allowed-group={{ $write }}
+            - --allowed-group={{ $admin }}
+            - --upstream=http://spark-history-node:18080
+            - --oidc-extra-audience=api://{{ .Values.clientId }}
+            - --email-domain=*
+            - --request-logging
+            - --auth-logging
+          env:
+            - name: http_proxy
+              value: "{{ .Values.httpProxy }}"
+            - name: https_proxy
+              value: "{{ .Values.httpProxy }}"
+            - name: HTTP_PROXY
+              value: "{{ .Values.httpProxy }}"
+            - name: HTTPS_PROXY
+              value: "{{ .Values.httpProxy }}"
+            - name: NO_PROXY
+              value: "spark-history-node, *.cluster.local, .cluster.local, localhost, 127.0.0.0/8, 127.0.0.1, .bosch.com, 127.0.0.*, 192.168.*, 192.168.0.0/16 .local, 172.*, 172.16.0.0/12, 10.*, 10.0.0.0/8, *.bosch.*"
+            - name: OAUTH2_PROXY_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name:  auth-secret
+                  key: clientId
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: auth-secret
+                  key: clientSecret
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: auth-secret
+                  key: sparkHistoryCookieSecret
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+{{- end -}}

@@ -1,0 +1,65 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: "b-{{ .Release.Name }}-in"
+spec:
+  finalizers:
+    - kubernetes
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: "b-{{ .Release.Name }}-in-rq"
+  namespace: "b-{{ .Release.Name }}-in"
+spec:
+  hard:
+    limits.cpu: "{{ .Values.internalns.cpuLimit }}"
+    limits.memory: "{{ .Values.internalns.memoryLimit }}"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-trino-from-everywhere
+  namespace: "b-{{ .Release.Name }}-in"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: "trino"
+      app.kubernetes.io/component: "coordinator"
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.0.0.0/8
+        - podSelector: { }    # allows traffic from internal namespace
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: "b-{{ .Release.Name }}"
+      ports:
+        - protocol: TCP
+          port: 8443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-proxy-from-everywhere
+  namespace: "b-{{ .Release.Name }}-in"
+spec:
+  podSelector:
+    matchLabels:
+      app: "proxy"
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.0.0.0/8
+        - podSelector: { }    # allows traffic from internal namespace
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: "b-{{ .Release.Name }}"
+      ports:
+        - protocol: TCP
+          port: 4180

@@ -1,0 +1,17 @@
+apiVersion: authentication.stackable.tech/v1alpha1
+kind: AuthenticationClass
+metadata:
+  name: "{{ .Release.Name }}-auth"
+spec:
+  provider:
+    oidc:
+      hostname: login.microsoftonline.com
+      rootPath: "{{ .Values.AzureTenant }}/v2.0"
+      scopes:
+        - "api://{{ .Values.clientId }}/trino"
+      principalClaim: upn
+      tls:
+        verification:
+          server:
+            caCert:
+              webPki: {}

@@ -1,0 +1,54 @@
+{{ $write := .Values.authGroups.write | default (printf "idm2bcd_bdps_b_%s_write" .Release.Name) }}
+{{ $admin := .Values.authGroups.admin | default (printf "idm2bcd_bdps_b_%s_admin" .Release.Name) }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: "b-{{ .Release.Name }}"
+spec:
+  finalizers:
+    - kubernetes
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: "b-{{ .Release.Name }}-rq"
+  namespace: "b-{{ .Release.Name }}"
+spec:
+  hard:
+    pods: "{{ .Values.customerns.podLimit }}"
+    limits.cpu: "{{ .Values.customerns.cpuLimit }}"
+    limits.memory: "{{ .Values.customerns.memoryLimit }}"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: customer-sa
+  namespace: "b-{{ .Release.Name }}"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+    name: customer-crb
+    namespace: "b-{{ .Release.Name }}"
+subjects:
+  - kind: ServiceAccount
+    name: customer-sa
+    namespace: "b-{{ .Release.Name }}"
+  - kind: Group
+    name: "{{ $write }}"
+  - kind: Group
+    name: "{{ $admin }}"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: "edit"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bdps
+  namespace: "b-{{ .Release.Name }}"
+data:
+  trino_host: "trino.b-{{ .Release.Name }}.svc.cluster.local"
+  trino_port: "8080"

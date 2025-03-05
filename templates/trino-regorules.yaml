@@ -1,0 +1,157 @@
+{{ $read  := .Values.authGroups.read  | default (printf "idm2bcd_bdps_b_%s_read"  .Release.Name) }}
+{{ $write := .Values.authGroups.write | default (printf "idm2bcd_bdps_b_%s_write" .Release.Name) }}
+{{ $admin := .Values.authGroups.admin | default (printf "idm2bcd_bdps_b_%s_admin" .Release.Name) }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trino-regorules
+  namespace: "b-{{ .Release.Name }}-in"
+  labels:
+    opa.stackable.tech/bundle: "true"
+data:
+{{ (.Files.Glob "regorules/*.rego").AsConfig | indent 2 }}
+  actual_rules.rego: |
+    package trino_policies
+
+    policies := {
+      "catalogs": [
+        {{- if .Values.trino.tpcds }}
+        {
+          "catalog": "tpcds",
+          "allow": "read-only"
+        },
+        {{- end }}
+        {
+          "group": "{{ $admin }}",
+          "allow": "all"
+        },
+        {
+          "catalog": "b-{{ .Release.Name }}",
+          "group": "{{ $read }}",
+          "allow": "read-only"
+        },
+        {
+          "catalog": "b-{{ .Release.Name }}",
+          "group": "{{ $write }}",
+          "allow": "all"
+        }
+      ],
+      "queries": [
+        {
+          "group": "{{ $admin }}",
+          "allow": ["execute", "kill", "view"],
+        },
+        {
+          "group": "idm2bcd_bdps_b_{{ .Release.Name }}_(read|write)",
+          "allow": ["execute", "view"],
+        }
+      ],
+      "schemas": [
+        {
+          "group": "{{ $admin }}",
+          "owner": true,
+        },
+        {
+          "group": "{{ $write }}",
+          "catalog": "b-{{ .Release.Name }}",
+          "schema": "default",
+          "owner": true,
+        }
+      ],
+      "tables": [
+        {{- if .Values.trino.tpcds -}}
+        {
+          "catalog": "tpcds",
+          "privileges": [
+            "SELECT",
+          ],
+        },
+        {{- end -}}
+        {
+          "group": "{{ $admin }}",
+          "privileges": [
+          "SELECT",
+          "INSERT",
+          "DELETE",
+          "UPDATE",
+          "OWNERSHIP",
+          ],
+        },
+        {
+          "group": "{{ $write }}",
+          "catalog": "b-{{ .Release.Name }}",
+          "privileges": [
+          "SELECT",
+          "INSERT",
+          "DELETE",
+          "UPDATE",
+          "OWNERSHIP",
+          ],
+        },
+        {
+          "group": "{{ $read }}",
+          "catalog": "b-{{ .Release.Name }}",
+          "privileges": [
+          "SELECT",
+          ],
+        },
+      ],
+      "system_information": [
+        {
+          "group": "{{ $admin }}",
+          "allow": ["read", "write"],
+        },
+        {
+          "group": "idm2bcd_bdps_b_{{ .Release.Name }}_(read|write)",
+          "allow": ["read"],
+        },
+      ],
+      "catalog_session_properties": [
+        {
+          "group": "{{ $admin }}",
+          "allow": true,
+        },
+        {
+          "group": "idm2bcd_bdps_b_{{ .Release.Name }}_(read|write)",
+          "property": "bucket_execution_enabled",
+          "allow": true,
+        },
+      ],
+      "system_session_properties": [
+        {
+          "group": "{{ $admin }}",
+          "allow": true,
+        },
+        {
+          "group": "idm2bcd_bdps_b_{{ .Release.Name }}_(read|write)",
+          "property": "resource_overcommit",
+          "allow": true,
+        },
+      ],
+      "impersonation": [
+      ],
+      "authorization": [
+      ],
+      "functions": [{
+        "group": "{{ $admin }}",
+        "catalog": ".*",
+        "schema": ".*",
+        "function": ".*",
+        "privileges": [
+          "EXECUTE",
+          "GRANT_EXECUTE",
+          "OWNERSHIP",
+        ],
+      }],
+      "procedures": [{
+        "group": "{{ $admin }}",
+        "catalog": ".*",
+        "schema": ".*",
+        "procedure": ".*",
+        "privileges": [
+          "EXECUTE",
+          "GRANT_EXECUTE",
+        ],
+      }],
+      }

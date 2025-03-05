@@ -1,0 +1,88 @@
+{{- if .Values.sparkhistory.enabled -}}
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: SecretClass
+metadata:
+  name: "s3-sec-{{ .Release.Name }}"
+spec:
+  backend:
+    k8sSearch:
+      searchNamespace:
+        pod: { }
+---
+apiVersion: s3.stackable.tech/v1alpha1
+kind: S3Connection
+metadata:
+  name: s3-connection
+  namespace: "b-{{ .Release.Name }}-in"
+spec:
+  accessStyle: Path
+  host: {{ .Values.s3.host }}
+  port: {{ .Values.s3.port }}
+  credentials:
+    secretClass: "s3-sec-{{ .Release.Name }}"
+  tls:
+    verification:
+      server:
+        caCert:
+          webPki: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: s3-credentials
+  namespace: "b-{{ .Release.Name }}-in"
+  labels:
+    secrets.stackable.tech/class: "s3-sec-{{ .Release.Name }}"
+stringData:
+  accessKey: "{{ .Values.s3.accessKey }}"
+  secretKey: "{{ .Values.s3.secretKey }}"
+---
+apiVersion: s3.stackable.tech/v1alpha1
+kind: S3Bucket
+metadata:
+  name: spark-s3bucket
+  namespace: "b-{{ .Release.Name }}-in"
+spec:
+  bucketName: "{{ .Values.s3.bucketName }}"
+  connection:
+    reference: s3-connection
+---
+apiVersion: s3.stackable.tech/v1alpha1
+kind: S3Connection
+metadata:
+  name: s3-connection
+  namespace: "b-{{ .Release.Name }}"
+spec:
+  accessStyle: Path
+  host: {{ .Values.s3.host }}
+  port: {{ .Values.s3.port }}
+  credentials:
+    secretClass: "s3-sec-{{ .Release.Name }}"
+  tls:
+    verification:
+      server:
+        caCert:
+          webPki: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: s3-credentials
+  namespace: "b-{{ .Release.Name }}"
+  labels:
+    secrets.stackable.tech/class: "s3-sec-{{ .Release.Name }}"
+stringData:
+  accessKey: "{{ .Values.s3.accessKey }}"
+  secretKey: "{{ .Values.s3.secretKey }}"
+---
+apiVersion: s3.stackable.tech/v1alpha1
+kind: S3Bucket
+metadata:
+  name: spark-s3bucket
+  namespace: "b-{{ .Release.Name }}"
+spec:
+  bucketName: "{{ .Values.s3.bucketName }}"
+  connection:
+    reference: s3-connection
+{{- end -}}

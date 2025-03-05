@@ -1,0 +1,45 @@
+name: changeme
+AzureTenant: 0ae51e19-07c8-4e4b-bb6d-648ee58410f4
+tokenIssuer: "https://sts.windows.net/0ae51e19-07c8-4e4b-bb6d-648ee58410f4/"
+clientId: 5fb8972a-e850-43e7-a717-4ab23a14dcc7
+clientSecret: changeme
+httpProxy: 10.143.0.177:8080
+internalns:
+  cpuLimit: 12  # This should be at least worker.count * worker.cpu.max + coordinator.count * coordinator.cpu.max
+  memoryLimit: 15Gi # This should be at least worker.count * worker.memory + coordinator.count * coordinator.memory
+customerns:
+  podLimit: 10
+  cpuLimit: 7
+  memoryLimit: 10Gi
+trino:
+  tpcds: true # Enable the TPC-DS catalog in Trino
+  worker:
+    count: 2
+    storage: 1Gi
+    cpu:
+      min: 1000m
+      max: 4000m
+    memory: 4Gi
+  coordinator:
+    count: 1
+    storage: 1Gi
+    cpu:
+      min: 500m
+      max: 2000m
+    memory: 4Gi
+authGroups: # default to idm2bcd_bdps_b_{{ .Release.Name }}_(read, write, admin)
+  read: ""
+  write: ""
+  admin: ""
+sparkhistory:
+  enabled: true
+  cpu:
+    min: 500m
+    max: 1000m
+  memory: 1Gi
+s3:
+  host: ns-emea-ipz-#your-instance-guid#.objectstore01.ipz001.internal.bosch.cloud
+  port: 9021
+  accessKey: objectusername
+  secretKey: objectuserpassword
+  bucketname: changeme
